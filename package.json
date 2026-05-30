@@ -1,0 +1,12 @@
+{
+  "name": "pi-skill-references",
+  "version": "0.1.0",
+  "description": "Reference implementation for Pi dollar-skill mentions.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
