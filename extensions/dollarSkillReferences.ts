@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { CustomEditor, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { fuzzyFilter, type AutocompleteItem, type AutocompleteProvider, type AutocompleteSuggestions } from "@earendil-works/pi-tui";
 
-import { findSkillReferenceToken, resolveSkillReferences } from "../src/skillReferences.js";
+import { findSkillReferenceToken, resolveSkillReferences, styleSkillReferences } from "../src/skillReferences.js";
 
 type LoadedSkill = {
 	name: string;
@@ -15,6 +15,8 @@ type SkillWithContent = LoadedSkill & {
 };
 
 const MAX_SUGGESTIONS = 20;
+const SKILL_REFERENCE_STYLE = "\x1b[1;36m";
+const RESET_STYLE = "\x1b[0m";
 
 function loadedSkills(pi: ExtensionAPI): LoadedSkill[] {
 	return pi
@@ -59,6 +61,49 @@ async function skillsWithContent(pi: ExtensionAPI): Promise<SkillWithContent[]> 
 	return contents;
 }
 
+class DollarSkillEditor extends CustomEditor {
+	constructor(
+		...args: ConstructorParameters<typeof CustomEditor>
+	) {
+		super(...args);
+	}
+
+	handleInput(data: string): void {
+		super.handleInput(data);
+		if (this.isDollarSkillAutocompleteInput(data)) {
+			(this as unknown as { tryTriggerAutocomplete(): void }).tryTriggerAutocomplete();
+		}
+	}
+
+	render(width: number): string[] {
+		return super.render(width).map((line) =>
+			styleSkillReferences(line, loadedSkillsForRender, (token) => `${SKILL_REFERENCE_STYLE}${token}${RESET_STYLE}`),
+		);
+	}
+
+	private isDollarSkillAutocompleteInput(data: string): boolean {
+		if (!/^[A-Za-z0-9$-]$/.test(data)) {
+			return false;
+		}
+
+		const text = this.getText();
+		const cursorIndex = this.getCursorIndex();
+		return findSkillReferenceToken(text, cursorIndex) !== null;
+	}
+
+	private getCursorIndex(): number {
+		const state = (this as unknown as { state: { lines: string[]; cursorLine: number; cursorCol: number } }).state;
+		let index = 0;
+		for (let lineIndex = 0; lineIndex < state.cursorLine; lineIndex += 1) {
+			index += (state.lines[lineIndex] ?? "").length + 1;
+		}
+
+		return index + state.cursorCol;
+	}
+}
+
+let loadedSkillsForRender: LoadedSkill[] = [];
+
 function createSkillAutocompleteProvider(pi: ExtensionAPI, current: AutocompleteProvider): AutocompleteProvider {
 	return {
 		async getSuggestions(lines, cursorLine, cursorCol, options): Promise<AutocompleteSuggestions | null> {
@@ -91,7 +136,9 @@ function createSkillAutocompleteProvider(pi: ExtensionAPI, current: Autocomplete
 
 export default function dollarSkillReferences(pi: ExtensionAPI): void {
 	pi.on("session_start", (_event, ctx) => {
+		loadedSkillsForRender = loadedSkills(pi);
 		ctx.ui.addAutocompleteProvider((current) => createSkillAutocompleteProvider(pi, current));
+		ctx.ui.setEditorComponent((tui, theme, keybindings) => new DollarSkillEditor(tui, theme, keybindings));
 	});
 
 	pi.on("input", async (event) => {

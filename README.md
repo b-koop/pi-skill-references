@@ -11,11 +11,11 @@ This package models the behavior from issues #1-#6:
 - submit-time prompt expansion that preserves the original prompt text,
 - deduplicated appended skill instruction blocks,
 - no expansion for spaced `$ skill-name` or unknown `$tokens`, and
-- editor highlight ranges for recognized contiguous skill references.
+- editor highlight ranges and visible styling for recognized contiguous skill references.
 
 ## API
 
-The Pi package registers `extensions/dollarSkillReferences.ts` when installed with `pi install /path/to/pi-skill-references`.
+The Pi package registers `extensions/dollarSkillReferences.ts` when installed with `pi install /path/to/pi-skill-references`. In an already-running Pi session, run `/reload` after installing or updating the local package.
 
 `src/skillReferences.js` exports:
 

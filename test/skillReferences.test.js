@@ -6,6 +6,7 @@ import {
   findSkillReferenceToken,
   highlightSkillReferences,
   resolveSkillReferences,
+  styleSkillReferences,
 } from '../src/skillReferences.js';
 
 const loadedSkills = [
@@ -89,5 +90,12 @@ test('users see concise skill reference context in autocomplete rows', () => {
   assert.equal(
     suggestion.detail,
     'Reference: Strict red, green, refactor development workflow with a deliberately…',
+  );
+});
+
+test('recognized skill references are formatted without styling unknown dollar text', () => {
+  assert.equal(
+    styleSkillReferences('use $tdd and $unknown', loadedSkills, (token) => `<skill>${token}</skill>`),
+    'use <skill>$tdd</skill> and $unknown',
   );
 });

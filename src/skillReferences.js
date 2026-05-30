@@ -111,6 +111,27 @@ export function highlightSkillReferences(text, skills) {
   return highlights;
 }
 
+/**
+ * Apply terminal/editor styling to known contiguous dollar-skill mentions.
+ *
+ * @param {string} text
+ * @param {{ name: string }[]} skills
+ * @param {(token: string, skillName: string) => string} format
+ */
+export function styleSkillReferences(text, skills, format) {
+  const highlights = highlightSkillReferences(text, skills);
+  let styled = '';
+  let cursor = 0;
+
+  for (const highlight of highlights) {
+    styled += text.slice(cursor, highlight.start);
+    styled += format(highlight.token, highlight.skillName);
+    cursor = highlight.end;
+  }
+
+  return styled + text.slice(cursor);
+}
+
 function fuzzyMatches(query, candidate) {
   if (query.length === 0) {
     return true;
