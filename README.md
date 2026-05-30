@@ -15,6 +15,8 @@ This package models the behavior from issues #1-#6:
 
 ## API
 
+The Pi package registers `extensions/dollarSkillReferences.ts` when installed with `pi install /path/to/pi-skill-references`.
+
 `src/skillReferences.js` exports:
 
 - `findSkillReferenceToken(text, cursor)` — returns the current contiguous dollar token before the cursor, or `null`.
