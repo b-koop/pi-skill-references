@@ -7,22 +7,23 @@ import {
   highlightSkillReferences,
   resolveSkillReferences,
   styleSkillReferences,
+  styleSkillReferencesIfAvailable,
 } from '../src/skillReferences.js';
 
 const loadedSkills = [
   {
     name: 'tdd',
     description: 'Strict red, green, refactor development workflow.',
-    content: '# TDD\n\nUse red, green, refactor loops.',
+    filePath: '/skills/tdd/SKILL.md',
   },
   {
     name: 'review-and-ship',
     description: 'Review current branch, validate it, and open a PR.',
-    content: '# Review and Ship\n\nReview, validate, commit, and ship.',
+    filePath: '/skills/review-and-ship/SKILL.md',
   },
 ];
 
-test('users see fuzzy skill suggestions while typing a contiguous dollar token', () => {
+test('users see fuzzy skill suggestions while typing a contiguous skill reference', () => {
   const token = findSkillReferenceToken('please use $rvw', 'please use $rvw'.length);
   const suggestions = completeSkillReference('please use $rvw', 'please use $rvw'.length, loadedSkills);
 
@@ -36,12 +37,12 @@ test('users see fuzzy skill suggestions while typing a contiguous dollar token',
   ]);
 });
 
-test('users do not see skill suggestions for spaced dollar text', () => {
+test('users do not see skill suggestions for spaced reference text', () => {
   assert.equal(findSkillReferenceToken('please use $ tdd', 'please use $ tdd'.length), null);
   assert.deepEqual(completeSkillReference('please use $ tdd', 'please use $ tdd'.length, loadedSkills), []);
 });
 
-test('model input keeps the original prompt and appends deduplicated known skill instructions', () => {
+test('model input keeps the original prompt and appends deduplicated skill file annotations', () => {
   const prompt = 'use $tdd then $tdd again';
 
   assert.equal(
@@ -49,22 +50,18 @@ test('model input keeps the original prompt and appends deduplicated known skill
     [
       'use $tdd then $tdd again',
       '',
-      '<skill_references>',
-      '<skill_reference name="tdd" token="$tdd">',
-      '# TDD',
-      '',
-      'Use red, green, refactor loops.',
-      '</skill_reference>',
-      '</skill_references>',
+      '<skill_reference_annotations>',
+      "- Where you see $tdd, reference the file: '/skills/tdd/SKILL.md'.",
+      '</skill_reference_annotations>',
     ].join('\n'),
   );
 });
 
-test('model input stays unchanged when dollar text is spaced or unknown', () => {
+test('model input stays unchanged when reference text is spaced or unknown', () => {
   assert.equal(resolveSkillReferences('$ tdd and $unknown', loadedSkills), '$ tdd and $unknown');
 });
 
-test('model input does not expand known skill names inside larger unknown dollar tokens', () => {
+test('model input does not expand known skill names inside larger unknown references', () => {
   assert.equal(resolveSkillReferences('$tdd_extra', loadedSkills), '$tdd_extra');
 });
 
@@ -74,7 +71,7 @@ test('users see recognized contiguous skill references highlighted in the editor
   ]);
 });
 
-test('users do not see known skill names highlighted inside larger unknown dollar tokens', () => {
+test('users do not see known skill names highlighted inside larger unknown references', () => {
   assert.deepEqual(highlightSkillReferences('$tdd_extra', loadedSkills), []);
 });
 
@@ -84,6 +81,7 @@ test('users see concise skill reference context in autocomplete rows', () => {
       name: 'tdd',
       description:
         'Strict red, green, refactor development workflow with a deliberately long explanation that should not dominate narrow terminal autocomplete rows.',
+      filePath: '/skills/tdd/SKILL.md',
     },
   ]);
 
@@ -93,9 +91,16 @@ test('users see concise skill reference context in autocomplete rows', () => {
   );
 });
 
-test('recognized skill references are formatted without styling unknown dollar text', () => {
+test('recognized skill references are formatted without styling unknown reference text', () => {
   assert.equal(
     styleSkillReferences('use $tdd and $unknown', loadedSkills, (token) => `<skill>${token}</skill>`),
     'use <skill>$tdd</skill> and $unknown',
+  );
+});
+
+test('users see unstyled skill reference text when editor styling is unavailable', () => {
+  assert.equal(
+    styleSkillReferencesIfAvailable('use $tdd and $unknown', loadedSkills, undefined),
+    'use $tdd and $unknown',
   );
 });

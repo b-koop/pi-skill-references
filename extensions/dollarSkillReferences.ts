@@ -1,17 +1,16 @@
-import { readFile } from "node:fs/promises";
 import { CustomEditor, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { fuzzyFilter, type AutocompleteItem, type AutocompleteProvider, type AutocompleteSuggestions } from "@earendil-works/pi-tui";
 
-import { findSkillReferenceToken, resolveSkillReferences, styleSkillReferences } from "../src/skillReferences.js";
+import {
+	findSkillReferenceToken,
+	resolveSkillReferences,
+	styleSkillReferencesIfAvailable,
+} from "../src/skillReferences.js";
 
 type LoadedSkill = {
 	name: string;
 	description: string;
 	filePath: string;
-};
-
-type SkillWithContent = LoadedSkill & {
-	content: string;
 };
 
 const MAX_SUGGESTIONS = 20;
@@ -49,18 +48,6 @@ function matchingSkillItems(skills: LoadedSkill[], query: string): AutocompleteI
 	return fuzzyFilter(skills, query, (skill) => skill.name).slice(0, MAX_SUGGESTIONS).map(skillToItem);
 }
 
-async function skillsWithContent(pi: ExtensionAPI): Promise<SkillWithContent[]> {
-	const skills = loadedSkills(pi);
-	const contents = await Promise.all(
-		skills.map(async (skill) => ({
-			...skill,
-			content: await readFile(skill.filePath, "utf8"),
-		})),
-	);
-
-	return contents;
-}
-
 class DollarSkillEditor extends CustomEditor {
 	constructor(
 		...args: ConstructorParameters<typeof CustomEditor>
@@ -77,7 +64,7 @@ class DollarSkillEditor extends CustomEditor {
 
 	render(width: number): string[] {
 		return super.render(width).map((line) =>
-			styleSkillReferences(line, loadedSkillsForRender, (token) => `${SKILL_REFERENCE_STYLE}${token}${RESET_STYLE}`),
+			styleSkillReferencesIfAvailable(line, loadedSkillsForRender, (token) => `${SKILL_REFERENCE_STYLE}${token}${RESET_STYLE}`),
 		);
 	}
 
@@ -142,8 +129,7 @@ export default function dollarSkillReferences(pi: ExtensionAPI): void {
 	});
 
 	pi.on("input", async (event) => {
-		const skills = await skillsWithContent(pi);
-		const resolvedText = resolveSkillReferences(event.text, skills);
+		const resolvedText = resolveSkillReferences(event.text, loadedSkills(pi));
 		if (resolvedText === event.text) {
 			return { action: "continue" as const };
 		}

@@ -2,7 +2,7 @@ const SKILL_TOKEN_PATTERN = /\$([A-Za-z0-9][A-Za-z0-9-]*)(?![A-Za-z0-9_-])/g;
 const DESCRIPTION_LIMIT = 68;
 
 /**
- * Find the contiguous dollar-skill token immediately before or under the cursor.
+ * Find the contiguous skill reference immediately before or under the cursor.
  * Spaced forms such as "$ tdd" are intentionally ignored.
  *
  * @param {string} text
@@ -26,7 +26,7 @@ export function findSkillReferenceToken(text, cursor) {
 }
 
 /**
- * Return concise autocomplete rows for loaded skills matching the current token.
+ * Return concise autocomplete rows for loaded skills matching the current reference.
  *
  * @param {string} text
  * @param {number} cursor
@@ -48,10 +48,10 @@ export function completeSkillReference(text, cursor, skills) {
 }
 
 /**
- * Preserve the original prompt and append full contents for known skill mentions.
+ * Preserve the original prompt and append deduplicated file annotations for known skill mentions.
  *
  * @param {string} prompt
- * @param {{ name: string, content: string }[]} skills
+ * @param {{ name: string, filePath?: string }[]} skills
  */
 export function resolveSkillReferences(prompt, skills) {
   const skillByName = new Map(skills.map((skill) => [skill.name, skill]));
@@ -74,17 +74,21 @@ export function resolveSkillReferences(prompt, skills) {
     return prompt;
   }
 
-  const sections = resolved.flatMap(({ token, skill }) => [
-    `<skill_reference name="${escapeAttribute(skill.name)}" token="${escapeAttribute(token)}">`,
-    skill.content,
-    '</skill_reference>',
-  ]);
+  const annotations = resolved.map(
+    ({ token, skill }) => `- Where you see ${token}, reference the file: '${escapeSingleQuoted(skill.filePath ?? skill.name)}'.`,
+  );
 
-  return [prompt, '', '<skill_references>', ...sections, '</skill_references>'].join('\n');
+  return [
+    prompt,
+    '',
+    '<skill_reference_annotations>',
+    ...annotations,
+    '</skill_reference_annotations>',
+  ].join('\n');
 }
 
 /**
- * Return editor ranges for known contiguous dollar-skill mentions.
+ * Return editor ranges for known contiguous skill references.
  *
  * @param {string} text
  * @param {{ name: string }[]} skills
@@ -112,7 +116,7 @@ export function highlightSkillReferences(text, skills) {
 }
 
 /**
- * Apply terminal/editor styling to known contiguous dollar-skill mentions.
+ * Apply terminal/editor styling to known contiguous skill references.
  *
  * @param {string} text
  * @param {{ name: string }[]} skills
@@ -132,6 +136,24 @@ export function styleSkillReferences(text, skills, format) {
   return styled + text.slice(cursor);
 }
 
+/**
+ * Apply skill-reference styling when the formatter exists.
+ *
+ * This lets callers degrade to plain text if an older runtime loads a module
+ * shape that does not provide the formatter function yet.
+ *
+ * @param {string} text
+ * @param {{ name: string }[]} skills
+ * @param {(token: string, skillName: string) => string | null | undefined} format
+ */
+export function styleSkillReferencesIfAvailable(text, skills, format) {
+  if (typeof format !== 'function') {
+    return text;
+  }
+
+  return styleSkillReferences(text, skills, format);
+}
+
 function fuzzyMatches(query, candidate) {
   if (query.length === 0) {
     return true;
@@ -147,8 +169,8 @@ function fuzzyMatches(query, candidate) {
   return queryIndex === query.length;
 }
 
-function escapeAttribute(value) {
-  return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
+function escapeSingleQuoted(value) {
+  return value.replaceAll('\\', '\\\\').replaceAll("'", "\\'");
 }
 
 function truncateDescription(description) {
